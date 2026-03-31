@@ -31,14 +31,14 @@ conda activate eeg_project
 # 4. Run notebooks in order
 jupyter lab
 # Open notebooks/01_data_inspection.py  (run as notebook via jupytext)
-# Open notebooks/02_single_subject.py
-# Open notebooks/03_all_subjects.py
+# Open notebooks/02_single_subject.py (run this notebook to see the entire pipeline for a single subject - Change this line of code: SUBJECT = "005" to any subject you want to analyse) 
+# Open notebooks/03_all_subjects.py (run this notebook to see the pipeline and grand average plots over all subjects)
 ```
 
 ## Notebook format
 Notebooks are stored as `.py` files with `# %%` cell markers (jupytext percent format).
 This keeps them diff-friendly in Git. JupyterLab opens them as notebooks automatically
-when jupytext is installed.
+when jupytext is installed. You can also directly run the notebooks as python files and see the results.
 
 ## Project structure
 ```
