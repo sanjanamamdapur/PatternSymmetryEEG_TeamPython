@@ -22,7 +22,7 @@ git clone <your-repo-url>
 cd EEGProject
 
 # 2. Create the conda environment (takes ~3 min)
-conda env create -f environment.yml
+conda env create -f environment.yml (This file contains all the necessary installations and running this will ensure you have the entire setup ready)
 conda activate eeg_project
 
 # 3. Set your local data path
