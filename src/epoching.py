@@ -46,9 +46,9 @@ def create_epochs(raw):
         raw,
         events,
         event_id=event_id,
-        tmin=-0.2,
-        tmax=0.8,
-        baseline=(None, 0),
+        tmin=EPOCH_TMIN,
+        tmax=EPOCH_TMAX,
+        baseline=BASELINE,
         preload=True
     )
 

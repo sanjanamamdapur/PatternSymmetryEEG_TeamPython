@@ -58,8 +58,8 @@ EOG_CHANNEL_NAMES = ["EOG_hL", "EOG_hR", "EOG_vU", "EOG_vD"]
 HIGHPASS_HZ = 0.1
 
 # Low-pass at 40 Hz: well above the frequency content of P1/N1 (< 15 Hz)
-# but removes high-frequency muscle noise. The original paper likely used
-# a similar cutoff.
+# but removes high-frequency muscle noise. The original paper used
+# 25 Hz.
 LOWPASS_HZ = 40.0
 
 # Notch at 50 Hz: UK power line frequency (confirmed from eeg.json).
@@ -108,5 +108,5 @@ N1_WINDOW_MS = (150, 200)
 SPN_WINDOW_MS = (300, 1000)
 
 # ── Plotting defaults ──────────────────────────────────────────────────────
-CONDITION_COLORS = {"Regular": "#E24B4A", "Random": "#378ADD"}
+CONDITION_COLORS = {"Regular":"#378ADD" , "Random": "#E24B4A"}
 FIGURE_DPI = 150

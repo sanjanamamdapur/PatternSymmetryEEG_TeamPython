@@ -248,6 +248,7 @@ def plot_erp_waveforms(
     for window, label, color in [
         (P1_WINDOW_MS, "P1", "orange"),
         (N1_WINDOW_MS, "N1", "steelblue"),
+        (SPN_WINDOW_MS, "SPN window", "purple"),
     ]:
         ax.axvspan(window[0], window[1], alpha=0.15, color=color, label=f"{label} window")
 
@@ -257,8 +258,9 @@ def plot_erp_waveforms(
     ax.set_ylabel("Amplitude (µV)")
     ax.set_title(f"ERP waveforms at {', '.join(channels)} — {subject}")
     ax.legend(loc="upper right", fontsize=9)
-    ax.invert_yaxis()  # ERP convention: negative up
+    #ax.invert_yaxis()  # ERP convention: negative up , updated code to ensure easier comparison with original paper which does not invert y-axis
     ax.set_xlim(-200, 1000)
+    #ax.set_ylim(-8, 8)
     plt.tight_layout()
     fig.savefig(RESULTS_DIR / f"erp_waveforms_{subject}.png", bbox_inches="tight")
     return fig
@@ -332,26 +334,34 @@ def plot_topomap_series(
         Defaults to every 100 ms from −200 to 1000 ms.
     """
     if time_windows is None:
-        time_windows = [(t, t + 100) for t in range(-200, 800, 100)]
+        time_windows = [(t, t + 100) for t in range(-200, 1000, 100)]
 
     evoked = grand_averages[condition]
-    times_s = [np.mean(w) / 1000.0 for w in time_windows]
 
     fig, axes = plt.subplots(2, 6, figsize=(14, 5))
     axes = axes.flatten()
 
-    for ax, t_s, (tmin, tmax) in zip(axes, times_s, time_windows):
+    for ax, (tmin, tmax) in zip(axes, time_windows):
+        tmin_s = tmin / 1000.0
+        tmax_s = tmax / 1000.0
+        t_center_s = (tmin_s + tmax_s) / 2.0
+        t_avg_s    = tmax_s - tmin_s          # window duration for averaging
+
+        # Use average= to plot the mean over the full window, not a single sample.
+        # This is critical: a single EEG sample is dominated by noise. Averaging
+        # over the window gives the stable, interpretable topography.
         evoked.plot_topomap(
-            times=t_s,
+            times=t_center_s,
+            average=t_avg_s,
             axes=ax,
             show=False,
             colorbar=False,
             time_format="",
             vlim=(-3e-6, 3e-6),
         )
-        ax.set_title(f"{tmin}–{tmax} ms", fontsize=9)
+        ax.set_title(f"{tmin}-{tmax} ms", fontsize=9)
 
-    fig.suptitle(f"Topographic maps — {condition}", fontsize=12)
+    fig.suptitle(f"Topographic maps - {condition}", fontsize=12)
     plt.tight_layout()
     fig.savefig(RESULTS_DIR / f"topomap_{condition}.png", bbox_inches="tight")
     return fig
@@ -369,28 +379,58 @@ def plot_difference_topomap(grand_averages: dict[str, mne.Evoked]):
         [grand_averages["Regular"], grand_averages["Random"]],
         weights=[1, -1],
     )
-    time_windows = [(80, 130), (150, 200), (300, 800)]
-    times_s = [np.mean(w) / 1000.0 for w in time_windows]
-    labels = ["P1 window\n(80–130 ms)", "N1 window\n(150–200 ms)", "SPN window\n(300–1000 ms)"]
+    # Time windows and their labels. Note the SPN window uses 300-800 ms
+    # (not 300-1000 ms) because the epoch only extends to +800 ms.
+    time_windows = [(80, 130), (150, 200), (300, 1000)]
+    labels = ["P1 window\n(80-130 ms)", "N1 window\n(150-200 ms)", "SPN window\n(300-1000 ms)"]
 
-    fig, axes = plt.subplots(1, 3, figsize=(10, 4))
-    for ax, t_s, lbl in zip(axes, times_s, labels):
+    # Color scale: ±2 µV for the difference map.
+    # In MNE, data is stored in Volts, so ±2 µV = ±2e-6 V.
+    # Red = Regular more positive than Random.
+    # Blue = Random more positive (= Regular more NEGATIVE) than Random.
+    # For the SPN, we EXPECT the back of the head to be BLUE (Regular more negative).
+    vlim_V = 2e-6   # ±2 µV expressed in Volts (MNE internal unit)
+
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+
+    for ax, (tmin, tmax), lbl in zip(axes, time_windows, labels):
+        tmin_s     = tmin / 1000.0
+        tmax_s     = tmax / 1000.0
+        t_center_s = (tmin_s + tmax_s) / 2.0
+        t_avg_s    = tmax_s - tmin_s   # duration for window averaging
+
+        # average=t_avg_s tells MNE to average over the entire window.
+        # Without this, plot_topomap picks a single sample (very noisy).
         diff.plot_topomap(
-            times=t_s,
+            times=t_center_s,
+            average=t_avg_s,
             axes=ax,
             show=False,
             colorbar=False,
             time_format="",
-            vlim=(-2e-6, 2e-6),
+            vlim=(-vlim_V, vlim_V),
         )
         ax.set_title(lbl, fontsize=10)
 
-    # Add a single shared colorbar
-    im = axes[0].collections[0]
-    cbar = fig.colorbar(im, ax=axes, orientation="vertical", fraction=0.02)
-    cbar.set_label("Amplitude (V)")
+    # Add a single shared colorbar with correct µV units.
+    # We grab the image from the first topomap axis and rescale ticks to µV.
+    import matplotlib.cm as cm
+    import matplotlib.colors as mcolors
 
-    fig.suptitle("Topographic maps — Regular minus Random difference", fontsize=12)
+    norm = mcolors.Normalize(vmin=-vlim_V * 1e6, vmax=vlim_V * 1e6)
+    sm   = cm.ScalarMappable(cmap="RdBu_r", norm=norm)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=axes.tolist(), orientation="vertical",
+                        fraction=0.03, pad=0.04)
+    cbar.set_label("Amplitude (µV)\n(Regular minus Random)", fontsize=10)
+    cbar.ax.tick_params(labelsize=9)
+
+    # Annotation explaining color meaning (matches paper convention)
+    fig.text(0.01, 0.02,
+             "Red = Regular > Random   |   Blue = Random > Regular (i.e. Regular more negative)",
+             fontsize=8, color="gray", style="italic")
+
+    fig.suptitle("Topographic maps - Regular minus Random difference", fontsize=12, y=1.02)
     plt.tight_layout()
     fig.savefig(RESULTS_DIR / "topomap_difference.png", bbox_inches="tight")
     return fig
